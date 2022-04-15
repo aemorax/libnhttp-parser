@@ -5,10 +5,6 @@
 #ifndef NHTTP_PARSER__H
 #define NHTTP_PARSER__H
 
-//#ifdef __cplusplus
-//extern "C" {
-//#endif
-
 #if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32) )
 #define __WINDOWS__
 #error "Windows is shit not supported yet"
@@ -20,35 +16,23 @@
 #define NHTTP_PUBLIC(type) type
 #endif
 
+#if defined (__GNUC__) || defined (__clang__) || defined (__TINTC__)
+#define N_PACK_TIGHT __attribute__ ((packed))
+#else
+#define N_PACK_TIGHT
+#endif
+
 #define NHTTP_VERSION_MAJOR 0
 #define NHTTP_VERSION_MINOR 1
 #define NHTTP_VERSION_PATCH 0
 
 #include <stddef.h>
 
-typedef struct nhttp_parser_tokenizer {
-  /* value of current index */
-  int current;
-  char * string;
-  size_t string_size;
-} nhttp_parser_tokenizer;
-
-typedef enum token_type {
-  TSPECIALS, // "(" | ")" | "<" | ">" | "@" | 
-             // "," | ";" | ":" | "\" | <"> |
-             // "/" | "[" | "]" | "?" | "=" |
-             // "{" | "}" | SP | HT
-} token_type;
-
-typedef struct nhttp_token {
-  nhttp_parser_tokenizer tokenizer;
-  char * string;
-  size_t string_size;
-  token_type type;
-} nhttp_token;
-
-//#ifdef __cplusplus
-//}
-//#endif
+typedef struct N_PACK_TIGHT nhttp_request_header {
+  const char * key;
+  size_t key_len;
+  const char * value;
+  size_t value_len;
+} nhttp_request_header_t;
 
 #endif
