@@ -27,12 +27,54 @@
 #define NHTTP_VERSION_PATCH 0
 
 #include <stddef.h>
+#include <stdint.h>
+
+typedef struct N_PACK_TIGHT nhttp_request_uri {
+  const char * scheme;
+  const size_t scheme_len;
+  
+  const char * authority;
+  const size_t authority_len;
+
+  const char * path;
+  const size_t path_len;
+
+  const char * query;
+  const size_t query_len;
+} nhttp_request_uri_t;
+
+typedef struct N_PACK_TIGHT nhttp_request_version {
+  const uint8_t major;
+  const uint8_t minor;
+} nhttp_request_version_t;
 
 typedef struct N_PACK_TIGHT nhttp_request_header {
   const char * key;
-  size_t key_len;
+  const size_t key_len;
   const char * value;
-  size_t value_len;
+  const size_t value_len;
 } nhttp_request_header_t;
+
+typedef struct N_PACK_TIGHT nhttp_request {
+  // Method
+  const char * method;
+  const size_t method_len;
+  
+  // URI
+  const nhttp_request_uri_t * uri;
+
+  // Version
+  const nhttp_request_version_t * version;
+
+  // Headers
+  const nhttp_request_header_t * headers;
+  const size_t headers_len;
+
+  // Message
+  const char * message;
+  const size_t message_len;
+} nhttp_request_t;
+
+#undef N_PACK_TIGHT
 
 #endif

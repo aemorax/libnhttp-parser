@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #define CR 13
 #define LF 10
