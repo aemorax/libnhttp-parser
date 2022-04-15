@@ -1,14 +1,12 @@
 #include "nhttp-parser.h"
 
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define CR 13
 #define LF 10
 #define SP 32
 
-typedef const enum parse_status {
+typedef enum parse_status {
   ERROR_REQUEST_METHOD_MALFORMED = -2,
   ERROR_REQUEST_MALFORMED = -1,  // for preprocessing request
   STATUS_OK = 0,
@@ -31,7 +29,6 @@ static const int8_t token_map[128] = {
 };
 
 static const int8_t is_token(const char item) { return token_map[item]; }
-
 typedef struct raw_http_request {
   const char *request;
   size_t request_len;
@@ -51,7 +48,7 @@ typedef struct raw_http_request {
   size_t request_version_len;
 } raw_http_request;
 
-static const int8_t pre_process_request(raw_http_request *req) {
+static const n_parse_error_t pre_process_request(raw_http_request *req) {
   const char *buf = req->request;
   const char *endbuf = buf + req->request_len;
   const char *start_pos = buf;
@@ -123,14 +120,35 @@ static const int8_t pre_process_request(raw_http_request *req) {
   return STATUS_OK;
 }
 
+static const n_parse_error_t validate_raw_request_method(
+    raw_http_request *request) {
+  const char *method_b = request->method;
+  const char *method_e = request->method + request->method_len;
+  while (method_b != method_e) {
+    if (!is_token(*method_b)) return ERROR_REQUEST_METHOD_MALFORMED;
+    method_b++;
+  }
+  return STATUS_OK;
+}
+
 static const n_parse_error_t parse_request(const char *buf, size_t buf_len,
-                                           raw_http_request *request) {
+                                           nhttp_request_t *req) {
   if (buf_len <= 0) return ERROR_REQUEST_MALFORMED;
 
-  request->request = buf;
-  request->request_len = buf_len;
+  raw_http_request request;
+  request.request = buf;
+  request.request_len = buf_len;
 
-  return pre_process_request(request);
+  n_parse_error_t parse_error = STATUS_OK;
+  parse_error = pre_process_request(&request);
+  if (parse_error < 0) return parse_error;
+
+  parse_error = validate_raw_request_method(&request);
+  if (parse_error < 0) return parse_error;
+  req->method = request.method;
+  req->method_len = request.method_len;
+
+  return STATUS_OK;
 }
 
 #undef CR
