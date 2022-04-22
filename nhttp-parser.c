@@ -2,6 +2,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <stdio.h>
 
 #define CR 13
 #define LF 10
@@ -81,28 +85,10 @@ static const int8_t digit_map[128] = {
     0, 0, 0, 0, 0, 0, 0, 0       
 };
 
-typedef struct raw_http_request {
-  const char *request;
-  size_t request_len;
-
-  const char *request_headers;
-  size_t request_headers_len;
-
-  const char *request_message;
-  size_t request_message_len;
-
-  const char *method;
-  size_t method_len;
-  const char *uri;
-  size_t uri_len;
-
-  const char *request_version;
-  size_t request_version_len;
-} raw_http_request;
-
-static const int32_t http_version_parse_machine(const char * buf, const char * endbuf) {
+static const int32_t http_version_parse_machine(const char * buf, const char * endbuf, nhttp_request_t * req) {
   int32_t movement = 0;
   char c = *buf;
+  int32_t minor_pos = 0;
 STATE_A:
   if(digit_map[c]) {
     movement++;
@@ -115,7 +101,12 @@ STATE_B:
     movement++;
     goto STATE_B;
   } else if(c == '.') {
+    // Special action to parse version to uint8
+    char major[movement];
+    memcpy(&major, buf, movement);
+    req->version_major = atoi(major);
     movement++;
+    minor_pos = movement;
     goto STATE_C;
   } else {
     return -1;
@@ -126,13 +117,14 @@ STATE_C:
     movement++;
     goto STATE_C;
   }
+  char minor[movement-minor_pos];
+  memcpy(&minor, buf+minor_pos, movement-minor_pos);
+  req->version_minor = atoi(minor);
 
   return movement;
 }
 
-static const n_parse_error_t pre_process_request(raw_http_request *req) {
-  const char *buf = req->request;
-  const char *endbuf = buf + req->request_len;
+static const n_parse_error_t process_request(const char * buf, const char * endbuf, nhttp_request_t * req) {
   const char *start_pos = buf;
 
   // Initializing Method
@@ -164,13 +156,13 @@ static const n_parse_error_t pre_process_request(raw_http_request *req) {
   buf++;
 
   // Initializing Request-Version
-  req->request_version = buf;
+  // req->request_version = buf;
   start_pos = buf;
 
   // HTTP/d.dCRLF string is at least 9 character length.
   if(buf + 9 < endbuf && *buf == 'H' && *(buf+1) == 'T' && *(buf+2) == 'T' && *(buf+3) == 'P' && *(buf+4) == '/') {
     buf+=5;
-    int32_t m = http_version_parse_machine(buf, endbuf);
+    int32_t m = http_version_parse_machine(buf, endbuf, req);
     if(m==-1) return ERROR_REQUEST_MALFORMED;
 
     buf+=m;
@@ -180,11 +172,11 @@ static const n_parse_error_t pre_process_request(raw_http_request *req) {
   } else {
     return ERROR_REQUEST_MALFORMED;
   }
-  req->request_version_len = buf - start_pos;
+  // req->request_version_len = buf - start_pos;
   buf += 2;
 
   // Initializing Request-Headers
-  req->request_headers = buf;
+  // req->headers = buf;
   start_pos = buf;
   while (buf - 1 <= endbuf) {
     if (buf > endbuf) return ERROR_REQUEST_MALFORMED;
@@ -198,16 +190,16 @@ static const n_parse_error_t pre_process_request(raw_http_request *req) {
     }
     buf++;
   }
-  req->request_headers_len = buf - start_pos;
+  // req->request_headers_len = buf - start_pos;
   buf += 2;
 
-  req->request_message = buf;
+  req->message = buf;
   start_pos = buf;
   do {
     buf++;
   } while (buf <= endbuf);
   buf--;
-  req->request_message_len = buf - start_pos;
+  req->message_len = buf - start_pos;
 
   return STATUS_OK;
 }
@@ -217,16 +209,9 @@ static const n_parse_error_t parse_request(const char *buf, size_t buf_len,
                                            nhttp_request_t *req) {
   if (buf_len <= 0) return ERROR_REQUEST_MALFORMED;
 
-  raw_http_request request;
-  request.request = buf;
-  request.request_len = buf_len;
-
   n_parse_error_t parse_error = STATUS_OK;
-  parse_error = pre_process_request(&request);
+  parse_error = process_request(buf, buf+buf_len, req);
   if (parse_error < 0) return parse_error;
-
-  req->method = request.method;
-  req->method_len = request.method_len;
 
   return STATUS_OK;
 }

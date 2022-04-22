@@ -29,25 +29,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct N_PACK_TIGHT nhttp_request_uri {
-  const char * scheme;
-  size_t scheme_len;
-  
-  const char * authority;
-  size_t authority_len;
-
-  const char * path;
-  size_t path_len;
-
-  const char * query;
-  size_t query_len;
-} nhttp_request_uri_t;
-
-typedef struct N_PACK_TIGHT nhttp_request_version {
-  uint8_t major;
-  uint8_t minor;
-} nhttp_request_version_t;
-
 typedef struct N_PACK_TIGHT nhttp_request_header {
   const char * key;
   size_t key_len;
@@ -61,10 +42,12 @@ typedef struct N_PACK_TIGHT nhttp_request {
   size_t method_len;
   
   // URI
-  const nhttp_request_uri_t * uri;
+  const char * uri;
+  size_t uri_len;
 
   // Version
-  const nhttp_request_version_t * version;
+  uint8_t version_major;
+  uint8_t version_minor;
 
   // Headers
   const nhttp_request_header_t * headers;
