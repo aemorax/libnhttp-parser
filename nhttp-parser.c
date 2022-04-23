@@ -2,13 +2,13 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define CR 13
 #define LF 10
 #define SP 32
+#define HT 9
 
 static const int8_t token_map[128] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -45,6 +45,21 @@ static const int8_t digit_map[128] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static const int8_t text_map[128] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 0};
 
 static const uint32_t predict_http_headers_count(const char *buf,
                                                  const char *endbuff) {
@@ -101,7 +116,77 @@ STATE_C:
   return movement;
 }
 
-const n_parse_error_t process_raw_request(const char *buf, const char *endbuf,
+const n_parse_error_t parse_headers(nhttp_raw_request_t *req, nhttp_request_header_t * headers) {
+  const char * buf = req->header;
+  const char * endbuf = req->header+req->header_len;
+  uint32_t count = 0;
+  uint32_t key_size = 0;
+  uint32_t value_size = 0;
+
+  while(count < req->headers_count) {
+STATE_A:
+  if(buf > endbuf)
+    return ERROR_REQUEST_MALFORMED;
+
+  if(token_map[*buf]) {
+    headers[count].key = buf;
+    key_size++;
+    buf++;
+    goto STATE_B;
+  } else {
+    return ERROR_REQUEST_MALFORMED;
+  }
+STATE_B:
+  if(buf > endbuf)
+    return ERROR_REQUEST_MALFORMED;
+
+  if(token_map[*buf]) {
+    key_size++;
+    buf++;
+    goto STATE_B;
+  }
+  else if(*buf == ':') {
+    headers[count].key_len = key_size;
+    key_size = 0;
+    buf++;
+    goto STATE_C;
+  } else {
+    return ERROR_REQUEST_MALFORMED;
+  }
+STATE_C:
+  if(buf > endbuf)
+    return ERROR_REQUEST_MALFORMED;
+
+  if(text_map[*buf]) {
+    headers[count].value = buf;
+    value_size++;
+    buf++;
+    goto STATE_D;
+  } else {
+    return ERROR_REQUEST_MALFORMED;
+  }
+STATE_D:
+  if(buf > endbuf)
+    return ERROR_REQUEST_MALFORMED;
+
+  if(text_map[*buf]) {
+    value_size++;
+    buf++;
+    goto STATE_D;
+  } else if(*buf == CR && *(buf+1) == LF) {
+    headers[count].value_len = value_size;
+    value_size = 0; 
+    buf+=2;
+  } else {
+    return ERROR_REQUEST_MALFORMED;
+  }
+  count++;
+  }
+    
+  return STATUS_OK;
+}
+
+const n_parse_error_t parse_request(const char *buf, const char *endbuf,
                                           nhttp_raw_request_t *req) {
   const char *start_pos = buf;
 
