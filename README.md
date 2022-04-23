@@ -9,7 +9,7 @@ typedef enum parse_status {
   ERROR_REQUEST_MALFORMED = -1,
   STATUS_OK = 0
 } n_parse_error_t;
-`
+```
 negative values for parse error and `STATUS_OK` for a complete parse.
 
 There are two structures exposed to use:
